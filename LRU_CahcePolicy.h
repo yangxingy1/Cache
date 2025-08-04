@@ -48,6 +48,7 @@ private:
     NodePtr head;
     NodePtr tail;
     
+    // 初始化双向链表和哈希表
     void initializeList()
     {
         // 创建头尾结点
@@ -57,6 +58,54 @@ private:
         head->next = tail;
         tail->prev = head;
     }
+
+    // 插入新节点(尾结点)
+    void insertNode(NodePtr node)
+    {
+        node->next = tail;
+        node->prev = tail->prev;
+        tail->prev.lock()->next = node;
+        tail->prev = node;
+    }
+
+    // 删去结点
+    void removeNode(NodePtr node)
+    {
+        if(!node->prev.expired() && node->next)
+        {
+            node->prev.lock()->next = node->next;
+            node->next->prev = node->prev;
+            node->next = nullptr;
+        }
+    }
+
+    // 驱逐最近最久未使用结点
+    void removeLeastRecent()
+    {
+        NodePtr least = head->next;
+        removeNode(least);
+        nodeMap.erase(least->getKey());
+    }
+
+    // 将结点移动到最近访问位置
+    void moveToMostRecent(NodePtr node)
+    {
+        removeNode(node);
+        insertNode(node);
+    }
+
+    // 添加新节点(若Cache满则先驱逐最近最久未使用)
+    void addNewNode(const Key& key, const Value& value)
+    {   
+        if(nodeMap.size() >= capacity)
+            removeLeastRecent();
+
+        NodePtr newNode = std::make_shared<NodeType>(key, value);
+        insertNode(newNode);
+        nodeMap[key] = newNode;
+    }
+
+public:
 
 
 };
