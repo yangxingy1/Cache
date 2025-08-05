@@ -105,12 +105,91 @@ private:
         nodeMap[key] = newNode;
     }
 
+    // 更新某结点的value值
+    void updateExistingNode(NodePtr node, const Value& value)
+    {
+        node->setValue(value);
+        moveToMostRecent(node);
+    }
+
 public:
+    
+    // 构造函数
+    LRUCache(int capacity)
+    {
+        this->capacity = capacity;
+        initializeList();
+    }
 
+    // 默认析构
+    ~LRUCache() override = default;
 
+    // 放入缓存     这里模拟放入过程是否要accessTime++?
+    void put(Key key, Value value) override
+    {
+        if(capacity <= 0)
+            return 
+        std::lock_guard<std::mutex> lock(mutex_);
+        auto it = nodeMap.find(key);
+        if(it != nodeMap.end())
+        {
+            // 缓存在Cache容器中已经存在    这里对内容进行更新覆写  增加访问次数记录
+            it->second->increaseAccessTime();
+
+            updateExistingNode(it->second, key);
+            return 
+        }
+        addNewNode(key, value);
+    }
+
+    // 从缓存中获取值(直接在传入引用中返回value)
+    bool get(Key key, Value& value) override
+    {
+        std::lock_guard<std::mutex> lock(mutex_);
+        auto it = nodeMap.find(key);
+        if(it != nodeMap.end)
+        {
+            // 访问该节点
+            moveToMostRecent(it->second);
+            // 增加访问次数
+            it->second->increaseAccessTime();
+            value = it->second->getValue();
+            return true;
+        }
+        return false;
+    }
+
+    // 从缓存中获取值(作为返回值返回value)
+    Value get(Key key) override
+    {
+        Value value{};
+        get(key, value);
+        return value;
+    }
+
+    // 删除指定页
+    void remove(Key key)
+    {
+        std::lock_guard<std::mutex> lock(mutex_);
+        auto it = nodemap.find(key);
+        if(it != nodemap.end())
+        {
+            removeNode(it->second);
+            nodeMap.erase(key);
+        }
+    }
+
+    // 获取结点访问次数接口     便于比较不同算法及优化
+    size_t getAccessTime(Key key)
+    {
+        std::lock_guard<std::mutex> lock(mutex_);
+        auto it = nodeMap.find(key);
+        if(it != nodeMap.end())
+            return it->second->getAccessTime();
+
+        return 0;
+    }
 };
-
-
 
 
 }
