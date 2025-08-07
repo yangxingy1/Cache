@@ -12,6 +12,8 @@
 
 \- **线程安全**：内置互斥锁保护共享数据
 
+\- **数据源支持**：使用SQLite模拟底层磁盘数据，模拟操作系统真实取页流程
+
 
 
 
@@ -41,6 +43,10 @@ LRU算法，即Least Recently Used（最近最少使用页面算法），在需�
 如图，使用哈希表和双向链表结合的数据结构实现了LRU页面置换算法：
 
 ![LRU实现原理图](image/LRU原理图2.png)
+
+SQLite下载网址：[SQLite Download Page](https://www.sqlite.org/download.html)
+
+使用文件式轻量级关系型数据库真实模拟操作系统取址流程
 
 
 
