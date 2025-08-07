@@ -1,4 +1,5 @@
-#include "LRU_CachePolicy.h"
+#include "include/LRU_CachePolicy.h"
+#include "include/SQLite.h"
 #include<iostream>
 #include<chrono>
 #include<random>
@@ -75,6 +76,9 @@ void testHotDataAccess()
 
 int main()
 {
-    testHotDataAccess();
+    std::cout << "hello world!" << std::endl;
+    SQL sql("source.db");
+    sql.printAll("pages");
+    // testHotDataAccess();
     return 0;
 }

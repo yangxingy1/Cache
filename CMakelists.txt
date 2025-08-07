@@ -1,0 +1,27 @@
+cmake_minimum_required(VERSION 3.10)
+
+project(Cache)
+
+# 设置 C++ 标准
+set(CMAKE_CXX_STANDARD 17)
+
+# 包含头文件目录
+include_directories(
+    ${PROJECT_SOURCE_DIR}/include
+    ${PROJECT_SOURCE_DIR}/lib/SQLite3
+)
+
+# 添加 SQLite3 源文件
+set(SQLITE3_SRC ${PROJECT_SOURCE_DIR}/lib/SQLite3/sqlite3.c)
+
+# 添加自定义源码文件
+set(SOURCE_FILES
+    main.cpp
+    src/SQLite.cpp
+    ${SQLITE3_SRC}
+)
+
+
+# 生成可执行文件
+add_executable(Cache ${SOURCE_FILES})
+
