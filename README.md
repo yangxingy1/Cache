@@ -44,9 +44,11 @@ LRU算法，即Least Recently Used（最近最少使用页面算法），在需�
 
 ![LRU实现原理图](image/LRU原理图2.png)
 
-SQLite下载网址：[SQLite Download Page](https://www.sqlite.org/download.html)
+### 3.底层数据源：
 
-使用文件式轻量级关系型数据库真实模拟操作系统取址流程
+使用文件式轻量级关系型数据库：SQLite3 真实模拟操作系统取址流程（SQLite下载网址：[SQLite Download Page](https://www.sqlite.org/download.html)）
 
+使用.dll和.a文件动态链接库
 
+这里对于数据库中的数据，默认所有的数据都是字符串varchar类型，在获取字符串类型后自行转换成缓存中所需要的Key，Value类型。
 

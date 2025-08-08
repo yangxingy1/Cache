@@ -2,6 +2,7 @@
 #include "include/SQLite.h"
 #include<iostream>
 #include<chrono>
+#include<ctime>
 #include<random>
 #include<vector>
 #include<iomanip>
@@ -12,14 +13,14 @@ using std::string, std::to_string, std::cout;
 
 void printResult(string testName, const int capacity, unsigned int& getTimes, unsigned int& hitTimes)
 {
-    cout << "=== " << testName << " 结果汇�? ===\n";
+    cout << "=== " << testName << " 结果汇总 ===\n";
     cout << "缓存大小: " << capacity << "\n";
     double hitRate = (double)hitTimes / getTimes * 100;
-    cout << testName << ": " << "命中�?: " << std::fixed << std::setprecision(2) << hitRate << "%";
+    cout << testName << ": " << "命中率: " << std::fixed << std::setprecision(2) << hitRate << "%";
     cout << "(" << hitTimes << "/" << getTimes << ")" << std::endl;
 }
 
-void testHotDataAccess()
+void testHotDataAccess(SQL_l& source)
 {
     // 定义容量 访问次数    热数据量    冷数据量
     const int capacity = 20;
@@ -36,13 +37,15 @@ void testHotDataAccess()
     unsigned int hitTimes = 0;
 
     LRUCache<int, string> cache(capacity);
-    //  插入热数据预热缓�?
+    //  插入热数据预热缓存
     for(int key=0; key < hotKeys;key++)
     {
         string value = to_string(key);
         cache.put(key, value);
     }
-
+    auto begin = std::chrono::system_clock::now();                    
+    std::time_t begin_time = std::chrono::system_clock::to_time_t(begin); 
+    cout << "开始时间：" << std::put_time(std::localtime(&begin_time), "%Y-%m-%d %H:%M:%S") << "\n";
     // 交替put get
     for(int op=0; op < operatorTimes; op++)
     {
@@ -68,8 +71,16 @@ void testHotDataAccess()
             string value;
             if(cache.get(key, value))
                 hitTimes++;
+            else
+            {
+                value = source.Query(to_string(key), "key", "value", "Pages");
+                cache.put(key, value);
+            }
         }
     }
+    auto end = std::chrono::system_clock::now();                   
+    std::time_t end_time = std::chrono::system_clock::to_time_t(end); 
+    std::cout << "结束时间：" << std::put_time(std::localtime(&end_time), "%Y-%m-%d %H:%M:%S") << std::endl;
     printResult("LRU", capacity, getTimes, hitTimes);
 }
 
@@ -78,16 +89,7 @@ int main()
 {
     std::cout << "hello world!" << std::endl;
     SQL_l sql("source.db");
-    sql.executeQuery("CREATE TABLE IF NOT EXISTS Pages (id INTEGER PRIMARY KEY AUTOINCREMENT, key INTEGER unique, value TEXT);");
-    for(int i=0;i < 100; i++)
-    {
-        std::string value = std::to_string(i+1);
-        std::string insert_sql = "INSERT INTO Pages (key, value) VALUES('" + std::to_string(i) + "', " + value + ");";
-        if(sql.insertData(insert_sql))
-            std::cout << "success to insert data!\n";
-    }
-    sql.printAll("pages");
-    testHotDataAccess();
+    testHotDataAccess(sql);
     int a;
     std::cin >> a;
     return 0;
