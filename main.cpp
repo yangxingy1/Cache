@@ -12,10 +12,10 @@ using std::string, std::to_string, std::cout;
 
 void printResult(string testName, const int capacity, unsigned int& getTimes, unsigned int& hitTimes)
 {
-    cout << "=== " << testName << " 结果汇总 ===\n";
+    cout << "=== " << testName << " 结果汇�? ===\n";
     cout << "缓存大小: " << capacity << "\n";
     double hitRate = (double)hitTimes / getTimes * 100;
-    cout << testName << ": " << "命中率: " << std::fixed << std::setprecision(2) << hitRate << "%";
+    cout << testName << ": " << "命中�?: " << std::fixed << std::setprecision(2) << hitRate << "%";
     cout << "(" << hitTimes << "/" << getTimes << ")" << std::endl;
 }
 
@@ -36,7 +36,7 @@ void testHotDataAccess()
     unsigned int hitTimes = 0;
 
     LRUCache<int, string> cache(capacity);
-    //  插入热数据预热缓存
+    //  插入热数据预热缓�?
     for(int key=0; key < hotKeys;key++)
     {
         string value = to_string(key);
@@ -77,8 +77,18 @@ void testHotDataAccess()
 int main()
 {
     std::cout << "hello world!" << std::endl;
-    SQL sql("source.db");
+    SQL_l sql("source.db");
+    sql.executeQuery("CREATE TABLE IF NOT EXISTS Pages (id INTEGER PRIMARY KEY AUTOINCREMENT, key INTEGER unique, value TEXT);");
+    for(int i=0;i < 100; i++)
+    {
+        std::string value = std::to_string(i+1);
+        std::string insert_sql = "INSERT INTO Pages (key, value) VALUES('" + std::to_string(i) + "', " + value + ");";
+        if(sql.insertData(insert_sql))
+            std::cout << "success to insert data!\n";
+    }
     sql.printAll("pages");
-    // testHotDataAccess();
+    testHotDataAccess();
+    int a;
+    std::cin >> a;
     return 0;
 }

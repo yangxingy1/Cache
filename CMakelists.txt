@@ -11,17 +11,14 @@ include_directories(
     ${PROJECT_SOURCE_DIR}/lib/SQLite3
 )
 
-# 添加 SQLite3 源文件
-set(SQLITE3_SRC ${PROJECT_SOURCE_DIR}/lib/SQLite3/sqlite3.c)
-
 # 添加自定义源码文件
-set(SOURCE_FILES
+set(SOURCES
     main.cpp
     src/SQLite.cpp
-    ${SQLITE3_SRC}
 )
 
-
 # 生成可执行文件
-add_executable(Cache ${SOURCE_FILES})
+add_executable(Cache ${SOURCES})
 
+# 链接 .a 静态导入库（必须是你刚刚生成的 libsqlite3.a）
+target_link_libraries(Cache PRIVATE ${PROJECT_SOURCE_DIR}/lib/SQLite3/libsqlite3.a)
