@@ -89,6 +89,15 @@ int main()
 {
     std::cout << "hello world!" << std::endl;
     SQL_l sql("source.db");
+    sql.executeQuery("CREATE TABLE IF NOT EXISTS Pages (id INTEGER PRIMARY KEY AUTOINCREMENT, key INTEGER unique, value TEXT);");
+    // for(int i=0;i < 5020; i++)
+    // {
+    //     std::string value = std::to_string(i+1);
+    //     std::string insert_sql = "INSERT INTO Pages (key, value) VALUES('" + std::to_string(i) + "', " + value + ");";
+    //     if(sql.insertData(insert_sql))
+    //         std::cout << "success to insert data!\n";
+    // }
+    // sql.printAll("Pages");
     testHotDataAccess(sql);
     int a;
     std::cin >> a;
