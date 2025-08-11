@@ -195,5 +195,21 @@ public:
     }
 };
 
+template<typename Key, typename Value>
+class LRU_KCache : public LRUCache<Key, Value>
+{
+private:
+    int k;                                                  // 进入主缓存的访问次数阈值
+    std::unique_ptr<LRUCache<Key, size_t>> historyList;     // 每个页的访问次数
+    std::unordered_map<Key, Value>                          // 存储未达到K次的数据
 
+public:
+    LRU_KCache(int capacity, int historyCapacity, int k) 
+        : LRUCache<Key, Value>(capacity)
+        , historyList(std::make_unique<LRUCache<Key, size_t>>(historyCapacity))
+        , k(k)
+    {}
+
+
+};
 }
