@@ -200,8 +200,9 @@ class LRU_KCache : public LRUCache<Key, Value>
 {
 private:
     int k;                                                  // 进入主缓存的访问次数阈值
-    std::unique_ptr<LRUCache<Key, size_t>> historyList;     // 每个页的访问次数
-    std::unordered_map<Key, Value>                          // 存储未达到K次的数据
+    std::unique_ptr<LRUCache<Key, size_t>> historyList;     // 每个页的访问次数 : 历史队列
+    std::unordered_map<Key, Value> historyValueMap;         // 存储未达到K次的数据
+    std::mutex mutex_;                                      // 保护子类的get/put
 
 public:
     LRU_KCache(int capacity, int historyCapacity, int k) 
@@ -210,6 +211,43 @@ public:
         , k(k)
     {}
 
+    Value get(Key key)
+    {
+        // 加锁保证线程安全
+        std::lock_guard<std::mutex> lock(mutex_);
+        
+        Value value{};
+
+        // 更新历史记录队列中的访问次数
+        size_t getTimes = historyList->get(key);
+        getTimes++;
+        historyList->put(key, getTimes);
+
+        // 查看是否在主缓存中
+        bool inMainCache = LRU_KCache<Key, Value>::get(key, value);
+        if(inMainCache)
+            return value;
+        
+        if(getTimes >= k)
+        {
+            auto it = historyValueMap.find(key);
+            if(it != historyValueMap.end())
+            {
+                // 保存历史值 放入主缓存中
+                Value historyValue = it->second;
+                LRUCache<Key, Value>::put(key, historyValue);
+
+                // 从历史队列、哈希表中删去
+                historyList->remove(key);
+                historyValueMap.erase(it);
+
+                return historyValue;
+            }
+
+        }
+        // 不在主缓存中且访问次数 < k
+        return value;
+    }
 
 };
 }
