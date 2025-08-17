@@ -249,5 +249,35 @@ public:
         return value;
     }
 
+    void put(Key key, Value value)
+    {
+        Value existingValue{};
+        bool inMainCache = LRUCache<Key, Value>::get(key, existingValue);
+
+        // 查看是否在主缓存中已经存在
+        if(inMainCache)
+        {
+            // 存在 -> 直接放入
+            LRUCache<Key, Value>::put(key, value);
+            return;
+        }
+
+        // 更新历史记录队列中的访问次数
+        size_t getTimes = historyList->get(key);
+        getTimes++;
+        historyList->put(key, getTimes);
+
+        // 保存键值对
+        historyValueMap[key] = value;
+
+        // 检查是否达到访问阈值 -> 放入主缓存
+        if(getTimes > k)
+        {
+            historyList.remove(key);
+            historyValueMap.erase(key);
+            LRUCache<Key, Value>::put(key, value);
+        }
+    }
 };
+
 }
