@@ -224,7 +224,7 @@ public:
         historyList->put(key, getTimes);
 
         // 查看是否在主缓存中
-        bool inMainCache = LRU_KCache<Key, Value>::get(key, value);
+        bool inMainCache = LRUCache<Key, Value>::get(key, value);
         if(inMainCache)
             return value;
         
@@ -273,7 +273,7 @@ public:
         // 检查是否达到访问阈值 -> 放入主缓存
         if(getTimes > k)
         {
-            historyList.remove(key);
+            historyList->remove(key);
             historyValueMap.erase(key);
             LRUCache<Key, Value>::put(key, value);
         }

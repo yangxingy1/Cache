@@ -1,3 +1,4 @@
+#include "include/CachePolicy.h"
 #include "include/LRU_CachePolicy.h"
 #include "include/SQLite.h"
 #include<iostream>
@@ -13,20 +14,23 @@ using std::string, std::to_string, std::cout;
 
 void printResult(string testName, const int capacity, unsigned int& getTimes, unsigned int& hitTimes)
 {
-    cout << "=== " << testName << " 结果汇总 ===\n";
+    cout << "========= " << testName << ": ============\n";
     cout << "缓存大小: " << capacity << "\n";
     double hitRate = (double)hitTimes / getTimes * 100;
     cout << testName << ": " << "命中率: " << std::fixed << std::setprecision(2) << hitRate << "%";
     cout << "(" << hitTimes << "/" << getTimes << ")" << std::endl;
+    cout << "=================================\n" << std::endl;
 }
 
 void testHotDataAccess(SQL_l& source)
 {
+    cout << "\n=== 测试场景1: 热点数据访问测试 ===\n" << std::endl;
+
     // 定义容量 访问次数    热数据量    冷数据量
     const int capacity = 20;
     const int operatorTimes = 500000;
     const int hotKeys = 20;
-    const int coldkeyS = 5000;
+    const int coldKeys = 5000;
 
     // 随机生成key
     std::random_device rd;
@@ -36,68 +40,76 @@ void testHotDataAccess(SQL_l& source)
     unsigned int getTimes = 0;
     unsigned int hitTimes = 0;
 
-    LRUCache<int, string> cache(capacity);
-    //  插入热数据预热缓存
-    for(int key=0; key < hotKeys;key++)
-    {
-        string value = to_string(key);
-        cache.put(key, value);
-    }
-    auto begin = std::chrono::system_clock::now();                    
-    std::time_t begin_time = std::chrono::system_clock::to_time_t(begin); 
-    cout << "开始时间：" << std::put_time(std::localtime(&begin_time), "%Y-%m-%d %H:%M:%S") << "\n";
-    // 交替put get
-    for(int op=0; op < operatorTimes; op++)
-    {
-        // 30%概率写    70%概率读
-        bool isPut = (gen() % 100 < 30);
-        int key;
+    // 初始化待测缓存
+    LRUCache<int, string> LRU_cache(capacity);
+    // 为LRU-K设置合适的参数：
+    // - 主缓存容量与其他算法相同
+    // - 历史记录容量设为可能访问的所有键数量
+    // - k=2表示数据被访问2次后才会进入缓存，适合区分热点和冷数据
+    LRU_KCache<int, string> LRU_K_cache(capacity, hotKeys+coldKeys, 2);
 
-        // 70%概率热数据    30%冷数据
-        bool isHot = (gen() % 100 < 70);
-        if(isHot)
-            key = gen() % hotKeys;
-        else
-            key = gen() % coldkeyS + hotKeys;
-        
-        if(isPut)
+    std::vector<Cache::Policy<int, string>*> caches = {&LRU_cache, &LRU_K_cache};
+    std::vector<string> cacheNames = {"LRU", "LRU-K"};
+
+    // 策略名称计数器
+    int i = 0;
+    for(auto policy:caches)
+    {
+        //  插入热数据预热缓存
+        for(int key=0; key < hotKeys;key++)
         {
-            string value = to_string(key) + "_" + to_string(op % 100);
-            cache.put(key, value);
+            string value = to_string(key);
+            policy->put(key, value);
         }
-        else
+        // 交替put get
+        for(int op=0; op < operatorTimes; op++)
         {
-            getTimes++;
-            string value;
-            if(cache.get(key, value))
-                hitTimes++;
+            // 30%概率写    70%概率读
+            bool isPut = (gen() % 100 < 30);
+            int key;
+
+            // 70%概率热数据    30%冷数据
+            bool isHot = (gen() % 100 < 70);
+            if(isHot)
+                key = gen() % hotKeys;
+            else
+                key = gen() % coldKeys + hotKeys;
+            
+            // 如果为写操作
+            if(isPut)
+            {
+                string value = to_string(key) + "_" + to_string(op % 100);
+                policy->put(key, value);
+            }
+            // 如果为读操作
             else
             {
-                value = source.Query(to_string(key), "key", "value", "Pages");
-                cache.put(key, value);
+                getTimes++;
+                string value;
+                // 命中则不变
+                if(policy->get(key, value))
+                    hitTimes++;
+                // 未命中则放入
+                else
+                {
+                    value = source.Query(to_string(key), "key", "value", "Pages");
+                    policy->put(key, value);
+                }
             }
         }
+        printResult(cacheNames[i], capacity, getTimes, hitTimes);
+        i++;
+        getTimes = 0;
+        hitTimes = 0;
     }
-    auto end = std::chrono::system_clock::now();                   
-    std::time_t end_time = std::chrono::system_clock::to_time_t(end); 
-    std::cout << "结束时间：" << std::put_time(std::localtime(&end_time), "%Y-%m-%d %H:%M:%S") << std::endl;
-    printResult("LRU", capacity, getTimes, hitTimes);
 }
 
 
 int main()
 {
-    std::cout << "hello world!" << std::endl;
+    cout << "hello world!" << std::endl;
     SQL_l sql("source.db");
-    sql.executeQuery("CREATE TABLE IF NOT EXISTS Pages (id INTEGER PRIMARY KEY AUTOINCREMENT, key INTEGER unique, value TEXT);");
-    // for(int i=0;i < 5020; i++)
-    // {
-    //     std::string value = std::to_string(i+1);
-    //     std::string insert_sql = "INSERT INTO Pages (key, value) VALUES('" + std::to_string(i) + "', " + value + ");";
-    //     if(sql.insertData(insert_sql))
-    //         std::cout << "success to insert data!\n";
-    // }
-    // sql.printAll("Pages");
+    // sql.executeQuery("CREATE TABLE IF NOT EXISTS Pages (id INTEGER PRIMARY KEY AUTOINCREMENT, key INTEGER unique, value TEXT);");
     testHotDataAccess(sql);
     int a;
     std::cin >> a;
