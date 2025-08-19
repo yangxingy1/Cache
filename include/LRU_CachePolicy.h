@@ -3,7 +3,7 @@
 #include<unordered_map>
 #include<list>
 #include<mutex>
-
+#include<vector>
 #include "CachePolicy.h"
 
 namespace Cache
@@ -195,6 +195,7 @@ public:
     }
 };
 
+// LRU-K: 在LRU基础上增加判断条件，访问次数达到K次后才加入缓存
 template<typename Key, typename Value>
 class LRU_KCache : public LRUCache<Key, Value>
 {
@@ -280,4 +281,54 @@ public:
     }
 };
 
-}
+// LRU-Slice: 分片LRU缓存 把缓存分片供多个线程取用 增强并发性能
+template<typename Key, typename Value>
+class LRU_HashCache : public LRUCache<Key, Value>
+{
+private:
+    size_t capacity;                                                        //总容量
+    int sliceNum;                                                           //分片数
+    std::vector<std::unique_ptr<LRUCache<Key, Value>>> LRU_SliceCaches;      //切片缓存
+
+    // 把key转换成对应的哈希值
+    static size_t Hash(Key key) const
+    {
+        std::hash<Key> hashFunc;
+        return hashFunc(key);
+    }
+
+public:
+    // 构造函数 -> 如果分片数未指定/不合法则使用CPU核心数
+    LRU_HashCache(size_t capacity, int sliceNum)
+        : capacity(capacity)
+        , sliceNum(sliceNum > 0 ? sliceNum : std::thread::hardware_concurrency())
+    {
+        size_t sliceSize = std::ceil(capacity / static_cast<double>(sliceNum)); // 向上取整计算每个分片容量
+        for(int i=0; i<sliceNum; i++)
+            LRU_SliceCaches.emplace_back(new LRUCache<Key, Value>(sliceNum));
+    }
+
+    void put(Key key, Value value)
+    {
+        // 计算出对应的分片位置并放入值
+        size_t position = Hash(key) % sliceNum;
+        LRU_SliceCaches[position]->put(key, value);
+    }
+
+    bool get(Key key, Value& value)
+    {
+        // 计算出分片位置并获取值
+        size_t position = Hash(key) % sliceNum;
+        return LRU_SliceCaches[position]->get(key, value);
+    }
+
+    Value get(Key key)
+    {
+        // 调用get(key, & value)方法
+        Value value{};
+        get(key, value);
+        return value;
+    }
+};
+
+}   // namespace Cache

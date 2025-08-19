@@ -13,12 +13,12 @@ include_directories(
 
 # 添加自定义源码文件
 set(SOURCES
-    main.cpp
-    src/SQLite.cpp
+    testAllPolicy.cpp
+    data/SQLite.cpp
 )
 
 # 生成可执行文件
 add_executable(Cache ${SOURCES})
 
-# 链接 .a 静态导入库（必须是你刚刚生成的 libsqlite3.a）
+# 链接 .a 静态导入库
 target_link_libraries(Cache PRIVATE ${PROJECT_SOURCE_DIR}/lib/SQLite3/libsqlite3.a)
