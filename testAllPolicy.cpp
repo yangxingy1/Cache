@@ -12,33 +12,41 @@
 using namespace Cache;
 using std::string, std::to_string, std::cout;
 
-void printResult(string testName, const int capacity, unsigned int& getTimes, unsigned int& hitTimes)
+void printResult(const int capacity, 
+                    const std::vector<string>& policyName, 
+                    const std::vector<unsigned int>& getTimes, 
+                    const std::vector<unsigned int>& hitTimes)
 {
-    cout << "========= " << testName << ": ============\n";
-    cout << "缓存大小: " << capacity << "\n";
-    double hitRate = (double)hitTimes / getTimes * 100;
-    cout << testName << ": " << "命中率: " << std::fixed << std::setprecision(2) << hitRate << "%";
-    cout << "(" << hitTimes << "/" << getTimes << ")" << std::endl;
-    cout << "=================================\n" << std::endl;
+    for(int i=0; i<policyName.size(); i++)
+    {
+        cout << "============== " << policyName[i] << ": ==============\n";
+        cout << "缓存大小: " << capacity << "\n";
+        double hitRate = (double)hitTimes[i] / getTimes[i] * 100;
+        cout << policyName[i] << ": " << "命中率: " << std::fixed << std::setprecision(2) << hitRate << "%";
+        cout << "(" << hitTimes[i] << "/" << getTimes[i] << ")" << std::endl;
+        cout << "===================================\n" << std::endl;
+    }
+
 }
 
 void testHotDataAccess(SQL_l& source)
 {
     cout << "\n=== 测试场景1: 热点数据访问测试 ===\n" << std::endl;
 
-    // 定义容量 访问次数    热数据量    冷数据量
+    // 定义容量 访问次数    热数据量    冷数据量    策略名称
     const int capacity = 20;
     const int operatorTimes = 500000;
     const int hotKeys = 20;
     const int coldKeys = 5000;
-
+    std::vector<string> cacheNames = {"LRU", "LRU-K"};
     // 随机生成key
     std::random_device rd;
     std::mt19937 gen(rd());
 
     // 读次数与命中次数 -> 求命中率
-    unsigned int getTimes = 0;
-    unsigned int hitTimes = 0;
+    // 结果存储
+    std::vector<unsigned int> getTimes(2, 0);
+    std::vector<unsigned int> hitTimes(2, 0);
 
     // 初始化待测缓存
     LRUCache<int, string> LRU_cache(capacity);
@@ -47,9 +55,9 @@ void testHotDataAccess(SQL_l& source)
     // - 历史记录容量设为可能访问的所有键数量
     // - k=2表示数据被访问2次后才会进入缓存，适合区分热点和冷数据
     LRU_KCache<int, string> LRU_K_cache(capacity, hotKeys+coldKeys, 2);
-
+    
     std::vector<Cache::Policy<int, string>*> caches = {&LRU_cache, &LRU_K_cache};
-    std::vector<string> cacheNames = {"LRU", "LRU-K"};
+    
 
     // 策略名称计数器
     int i = 0;
@@ -84,11 +92,11 @@ void testHotDataAccess(SQL_l& source)
             // 如果为读操作
             else
             {
-                getTimes++;
+                getTimes[i]++;
                 string value;
                 // 命中则不变
                 if(policy->get(key, value))
-                    hitTimes++;
+                    hitTimes[i]++;
                 // 未命中则放入
                 else
                 {
@@ -97,14 +105,81 @@ void testHotDataAccess(SQL_l& source)
                 }
             }
         }
-        printResult(cacheNames[i], capacity, getTimes, hitTimes);
         i++;
-        getTimes = 0;
-        hitTimes = 0;
     }
+    printResult(capacity, cacheNames, getTimes, hitTimes);
 }
 
+void testLoopPattern(SQL_l& source) 
+{
+    cout << "\n=== 测试场景2：循环扫描测试 ===\n" << std::endl;
+    // 定义容量     循环范围    操作次数    策略名称
+    const int capacity = 50;          
+    const int loopSize = 500;        
+    const int operations = 200000;    
+    std::vector<string> cacheNames = {"LRU", "LRU-K"};
 
+    // 随机生成key
+    std::random_device rd;
+    std::mt19937 gen(rd());
+    
+    // 初始化待测缓存
+    LRUCache<int, string> LRU_cache(capacity);
+    // 为LRU-K设置合适的参数：
+    // - 主缓存容量与其他算法相同
+    // - 历史记录容量设为可能访问的所有键数量
+    // - k=2表示数据被访问2次后才会进入缓存，适合区分热点和冷数据
+    LRU_KCache<int, string> LRU_K_cache(capacity, loopSize * 2, 2);
+
+    std::vector<Cache::Policy<int, string>*> caches = {&LRU_cache, &LRU_K_cache};
+    std::vector<unsigned int> hitTimes(2, 0);
+    std::vector<unsigned int> getTimes(2, 0);
+
+
+    // 为每种缓存算法运行相同的测试
+    for (int i = 0; i < caches.size(); ++i) {
+        // 先预热一部分数据（只加载20%的数据）
+        for (int key = 0; key < loopSize / 5; ++key) {
+            std::string value = "loop" + std::to_string(key);
+            caches[i]->put(key, value);
+        }
+        
+        // 设置循环扫描的当前位置
+        int current_pos = 0;
+        
+        // 交替进行读写操作，模拟真实场景
+        for (int op = 0; op < operations; ++op) {
+            // 20%概率是写操作，80%概率是读操作
+            bool isPut = (gen() % 100 < 20);
+            int key;
+            
+            // 按照不同模式选择键
+            if (op % 100 < 60) {  // 60%顺序扫描
+                key = current_pos;
+                current_pos = (current_pos + 1) % loopSize;
+            } else if (op % 100 < 90) {  // 30%随机跳跃
+                key = gen() % loopSize;
+            } else {  // 10%访问范围外数据
+                key = loopSize + (gen() % loopSize);
+            }
+            
+            if (isPut) {
+                // 执行put操作，更新数据
+                std::string value = "loop" + std::to_string(key) + "_v" + std::to_string(op % 100);
+                caches[i]->put(key, value);
+            } else {
+                // 执行get操作并记录命中情况
+                std::string result;
+                getTimes[i]++;
+                if (caches[i]->get(key, result)) {
+                    hitTimes[i]++;
+                }
+            }
+        }
+    }
+
+    printResult(capacity, cacheNames, getTimes, hitTimes);
+}
 int main()
 {
     cout << "hello world!" << std::endl;

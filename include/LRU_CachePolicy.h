@@ -1,3 +1,5 @@
+#include<cmath>
+#include<thread>
 #include<string>
 #include<memory>
 #include<unordered_map>
@@ -291,7 +293,7 @@ private:
     std::vector<std::unique_ptr<LRUCache<Key, Value>>> LRU_SliceCaches;      //切片缓存
 
     // 把key转换成对应的哈希值
-    static size_t Hash(Key key) const
+    static size_t Hash(Key key)
     {
         std::hash<Key> hashFunc;
         return hashFunc(key);
