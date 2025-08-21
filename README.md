@@ -60,9 +60,10 @@ LRU算法，即Least Recently Used（最近最少使用页面算法），在需�
 
 这里覆写了Value get(Key key)及void put(Key key, Value value)方法，实现了对访问次数的判断后放入。在测试.cpp文件中，通过put的覆写更改了应有的放入逻辑，提高了命中率。
 
-#### LRU-Slice：
+#### LRU-Hash：
 
 使用继承的方式对LRU算法再次优化，对LRU缓存进行分片，供给不同的进程使用。在不同进程请求不同的键缓存时，可以在不同的分片缓存中同时获取对应的值，提升了缓存系统的并发速率。类中引入vector构造对象存放多个分片LRU缓存指针引用，使用hash函数计算每一个键对应的片区，使用vector中的指针对缓存进行访问。
 
 覆写了所有get、put方法。
 
+![LRU-Hash原理图](image/LRU-Hash原理图.png)

@@ -60,14 +60,13 @@ void testHotDataAccess(SQL_l& source)
     
 
     // 策略名称计数器
-    int i = 0;
-    for(auto policy:caches)
+    for(int i=0; i<caches.size(); i++)
     {
         //  插入热数据预热缓存
         for(int key=0; key < hotKeys;key++)
         {
             string value = to_string(key);
-            policy->put(key, value);
+            caches[i]->put(key, value);
         }
         // 交替put get
         for(int op=0; op < operatorTimes; op++)
@@ -87,7 +86,7 @@ void testHotDataAccess(SQL_l& source)
             if(isPut)
             {
                 string value = to_string(key) + "_" + to_string(op % 100);
-                policy->put(key, value);
+                caches[i]->put(key, value);
             }
             // 如果为读操作
             else
@@ -95,17 +94,16 @@ void testHotDataAccess(SQL_l& source)
                 getTimes[i]++;
                 string value;
                 // 命中则不变
-                if(policy->get(key, value))
+                if(caches[i]->get(key, value))
                     hitTimes[i]++;
                 // 未命中则放入
                 else
                 {
                     value = source.Query(to_string(key), "key", "value", "Pages");
-                    policy->put(key, value);
+                    caches[i]->put(key, value);
                 }
             }
         }
-        i++;
     }
     printResult(capacity, cacheNames, getTimes, hitTimes);
 }
@@ -139,54 +137,65 @@ void testLoopPattern(SQL_l& source)
     // 为每种缓存算法运行相同的测试
     for (int i = 0; i < caches.size(); ++i) {
         // 先预热一部分数据（只加载20%的数据）
-        for (int key = 0; key < loopSize / 5; ++key) {
+        for (int key = 0; key < loopSize / 5; ++key) 
+        {
             std::string value = "loop" + std::to_string(key);
             caches[i]->put(key, value);
         }
-        
         // 设置循环扫描的当前位置
         int current_pos = 0;
-        
+
         // 交替进行读写操作，模拟真实场景
-        for (int op = 0; op < operations; ++op) {
+        for (int op = 0; op < operations; ++op) 
+        {
             // 20%概率是写操作，80%概率是读操作
             bool isPut = (gen() % 100 < 20);
             int key;
-            
             // 按照不同模式选择键
-            if (op % 100 < 60) {  // 60%顺序扫描
+            // 60%顺序扫描
+            if(op % 100 < 60) 
+            {
                 key = current_pos;
                 current_pos = (current_pos + 1) % loopSize;
-            } else if (op % 100 < 90) {  // 30%随机跳跃
+            } 
+            // 30%随机跳跃
+            else if(op % 100 < 90)          
                 key = gen() % loopSize;
-            } else {  // 10%访问范围外数据
+            // 10%访问范围外数据
+            else  
                 key = loopSize + (gen() % loopSize);
-            }
-            
-            if (isPut) {
+            if(isPut) 
+            {
                 // 执行put操作，更新数据
                 std::string value = "loop" + std::to_string(key) + "_v" + std::to_string(op % 100);
                 caches[i]->put(key, value);
-            } else {
-                // 执行get操作并记录命中情况
-                std::string result;
+            } 
+            else 
+            {
+                std::string value;
                 getTimes[i]++;
-                if (caches[i]->get(key, result)) {
+                // 执行get操作并记录命中情况
+                if(caches[i]->get(key, value)) 
                     hitTimes[i]++;
+                else
+                {
+                    value = source.Query(to_string(key), "key", "value", "Pages");
+                    caches[i]->put(key, value);
                 }
             }
         }
     }
-
     printResult(capacity, cacheNames, getTimes, hitTimes);
 }
+
 int main()
 {
     cout << "hello world!" << std::endl;
+    // 初始化数据库
     SQL_l sql("source.db");
-    // sql.executeQuery("CREATE TABLE IF NOT EXISTS Pages (id INTEGER PRIMARY KEY AUTOINCREMENT, key INTEGER unique, value TEXT);");
     testHotDataAccess(sql);
-    int a;
-    std::cin >> a;
+    testLoopPattern(sql);
+    // int a;
+    // std::cin >> a;
     return 0;
 }
