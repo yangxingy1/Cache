@@ -285,7 +285,7 @@ public:
 
 // LRU-Slice: 分片LRU缓存 把缓存分片供多个线程取用 增强并发性能
 template<typename Key, typename Value>
-class LRU_HashCache : public LRUCache<Key, Value>
+class LRU_HashCache : public Policy<Key, Value>
 {
 private:
     size_t capacity;                                                        //总容量
@@ -307,7 +307,16 @@ public:
     {
         size_t sliceSize = std::ceil(capacity / static_cast<double>(sliceNum)); // 向上取整计算每个分片容量
         for(int i=0; i<sliceNum; i++)
-            LRU_SliceCaches.emplace_back(new LRUCache<Key, Value>(sliceNum));
+            LRU_SliceCaches.emplace_back(new LRUCache<Key, Value>(sliceSize));
+    }
+
+    LRU_HashCache(size_t capacity)
+        : capacity(capacity)
+        , sliceNum(std::thread::hardware_concurrency())
+    {
+        size_t sliceSize = std::ceil(capacity / static_cast<double>(sliceNum)); // 向上取整计算每个分片容量
+        for(int i=0; i<sliceNum; i++)
+            LRU_SliceCaches.emplace_back(new LRUCache<Key, Value>(sliceSize));
     }
 
     void put(Key key, Value value)
