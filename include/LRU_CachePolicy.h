@@ -22,18 +22,15 @@ private:
     // 键值 访问次数 前/后向指针
     Key key;
     Value value;
-    size_t access_times;
     std::weak_ptr<LRUNode<Key, Value>> prev;
     std::shared_ptr<LRUNode<Key, Value>> next;
 
 public:
-    LRUNode(Key key, Value value) : key(key), value(value), access_times(1) {}
-    // 获取key value access_times 设置value 访问结点
+    LRUNode(Key key, Value value) : key(key), value(value) {}
+    // 获取key value 设置value 访问结点
     Key getKey() const {return key;}
     Value getValue() const {return value;}
     void setValue(const Value &value) {this->value = value;}
-    size_t getAccessTimes() const {return access_times;}
-    void increaseAccessTimes() {++access_times;}
 
     friend class LRUCache<Key, Value>;
 };
@@ -139,9 +136,7 @@ public:
         auto it = nodeMap.find(key);
         if(it != nodeMap.end())
         {
-            // 缓存在Cache容器中已经存在    这里对内容进行更新覆写  增加访问次数记录
-            it->second->increaseAccessTimes();
-
+            // 缓存在Cache容器中已经存在    这里对内容进行更新覆写  
             updateExistingNode(it->second, value);
             return;
         }
@@ -157,8 +152,6 @@ public:
         {
             // 访问该节点
             moveToMostRecent(it->second);
-            // 增加访问次数
-            it->second->increaseAccessTimes();
             value = it->second->getValue();
             return true;
         }
@@ -185,16 +178,6 @@ public:
         }
     }
 
-    // 获取结点访问次数接口     便于比较不同算法及优化
-    size_t getAccessTime(Key key)
-    {
-        std::lock_guard<std::mutex> lock(mutex_);
-        auto it = nodeMap.find(key);
-        if(it != nodeMap.end())
-            return it->second->getAccessTime();
-
-        return 0;
-    }
 };
 
 // LRU-K: 在LRU基础上增加判断条件，访问次数达到K次后才加入缓存
