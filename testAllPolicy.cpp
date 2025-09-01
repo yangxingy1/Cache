@@ -1,5 +1,6 @@
 #include "include/CachePolicy.h"
 #include "include/LRU_CachePolicy.h"
+#include "include/LFU_CachePolicy.h"
 #include "data/SQLite.h"
 #include<iostream>
 #include<chrono>
@@ -99,16 +100,12 @@ void testHotDataAccess(SQL_l& source)
                 string value;
                 // 命中则不变
                 if(caches[i]->get(key, value))
-                {
                     hitTimes[i]++;
-                    // cout << "get:" << key << "    1" << std::endl;
-                }
                 // 未命中则放入
                 else
                 {
                     value = source.Query(to_string(key), "key", "value", "Pages");
                     caches[i]->put(key, value);
-                    // cout << "get:" << key << "    0" << std::endl;
                 }
             }
         }
