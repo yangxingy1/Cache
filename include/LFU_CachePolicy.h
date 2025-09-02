@@ -12,6 +12,9 @@ namespace Cache
     
 template<typename Key, typename Value> class LFU_Cache;
 
+// 新加入的结点使用尾插法插入尾部   
+// 访问次数增加后需删去的结点直接拿出
+// 在页置换时需要舍弃的结点从头部开始拿出(最低频中最老的结点先淘汰)
 template<typename Key, typename Value>
 class NodeList
 {
@@ -65,8 +68,123 @@ public:
 
     void removeNode(NodePtr node)
     {
+        if(!head || !tail || !node)
+            return;
+        if(!node->next || node->pre.expired())
+            return;
+        node->pre.lock()->next = node->next;
+        node->next->pre = node->pre;
+        // 显示置空next 彻底断开链接
+        node->next = nullptr;
+    }
+
+    NodePtr getFirstNode() const {  return head->next;  }
+
+};
+
+template<typename Key, typename Value>
+class LFU_Cache : Policy<Key, Value>
+{
+    using Node = typename FreqList<Key, Value>::Node;
+    using NodePtr = shared_ptr<Node>;
+    using NodeMap = std::unordered_map<Key, NodePtr>;
+private:
+    int capacity;           // 最大容量
+    int minFreq;            // 最低访问频次
+    int maxAverageNum;      // 最大平均访问频次
+    int curTotalNum;        // 当前总访问频次
+    int curAverageNum;      // 当前平均访问频次
+    std::mutex mutex;       // 互斥锁
+    NodeMap nodeMap;        // key -> 缓存结点
+    std::unordered_map<int, NodeList<Key, Value>*> freqToFreqList;      // 访问频次 -> 对应列表 
+
+private:
+    // 把新结点放入对应的访问频次列表中
+    void addToFreqList(NodePtr node)
+    {
+        if(!node)
+            return;
+
+        auto freq = node->freq;
+        // 没有则新增列表
+        if(freqToFreqList.find(freq) == freqToFreqList.end())
+            freqToFreqList[freq] = new NodeList<Key, Value>(freq);
+        
+        freqToFreqList[freq]->addNode(node);
+    }
+
+    // 把结点从对应的访问频次列表中删去
+    void removeFromFreqList(NodePtr node)
+    {
+        if(!node)
+            return;
+
+        auto freq = node->freq;
+        // 没有则直接返回
+        if(freqToFreqList.find(freq) == freqToFreqList.end())
+            return;
+        freqToFreqList[freq]->removeNode(node);
+    }
+
+    // 访问次数+1
+    void addFreqNum()
+    {
+        curTotalNum++;
+        if(nodeMap.empty())
+            curAverageNum = 0;
+        else
+            curAverageNum = curTotalNum / nodeMap.size();
+        
+        if(curTotalNum > maxAverageNum)
+            handleOverMaxAverageNum();
         
     }
+
+    // 更新最小频率
+    void updateMinFreq()
+    {
+        minFreq = INT8_MAX;
+        // 遍历找出最小的访问频率
+        for(const auto& pair : nodeMap)
+            if(!pair.second && !pair.second->isEmpty())
+                minFreq = std::min(minFreq, pair.first);
+        if(minFreq == INT8_MAX)
+            minFreq = 1;
+    }
+
+    // 减少平均访问次数和总频次 -> 便于在长时间累计时仍然保持缓存内容的持续更新
+    void decreaseFreqNum(int num)
+    {
+        curTotalNum -= num;
+        if(nodeMap.empty())
+            curAverageNum = 0;
+        else
+            curAverageNum = curTotalNum / nodeMap.size();
+    }
+
+    // 处理超过最大平均访问次数时的情况 -> -=MaxAverageNum / 2  后重新计数
+    void handleOverMaxAverageNum()
+    {
+        if(nodeMap.empty())
+            return;
+
+        // 所有的节点频率 -= MaxAverageNum / 2
+        for(auto it : nodeMap)
+        {
+            if(!it->second)
+                continue;
+            NodePtr node = it->second;
+
+            removeFromFreqList(node);
+            node->freq = (node->freq - maxAverageNum / 2) > 1 ? node->freq - maxAverageNum / 2: 1;
+            addToFreqList(node);
+        }
+        updateMinFreq();
+    }
+
+    void putInternel();
+    void getInternel();
+    
 };
 
 
