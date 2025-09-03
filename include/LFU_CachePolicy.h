@@ -78,6 +78,7 @@ public:
         node->next = nullptr;
     }
 
+    // 获取头部第一个结点用于置换删除
     NodePtr getFirstNode() const {  return head->next;  }
 
 };
@@ -85,8 +86,8 @@ public:
 template<typename Key, typename Value>
 class LFU_Cache : Policy<Key, Value>
 {
-    using Node = typename FreqList<Key, Value>::Node;
-    using NodePtr = shared_ptr<Node>;
+    using Node = typename NodeList<Key, Value>::Node;
+    using NodePtr = std::shared_ptr<Node>;
     using NodeMap = std::unordered_map<Key, NodePtr>;
 private:
     int capacity;           // 最大容量
@@ -182,13 +183,95 @@ private:
         updateMinFreq();
     }
 
-    void putInternel();
-    void getInternel();
+    // key 不在缓存中时放入
+    void putInternel(Key key, Value value)
+    {
+        // 判断缓存容量
+        if(nodeMap.size() == capacity)
+            kickOut();
+
+        NodePtr node = std::make_shared<Node>(key, value);
+        nodeMap[key] = node;
+        addToFreqList(node);
+        addFreqNum();
+        minFreq = std::min(minFreq, 1);
+    }
+
+    // 缓存满时移除最早最少访问结点
+    void kickOut()
+    {
+        NodePtr node = freqToFreqList[minFreq]->getFirstNode();
+        removeFromFreqList(node);
+        nodeMap.erase(node->key);
+        decreaseFreqNum(node->freq);
+    }
+
+    // 从缓存中获取value
+    void getInternel(NodePtr node, Value& value)
+    {
+        value = node->value;
+
+        removeFromFreqList(node);
+        node->freq++;
+        addToFreqList(node);
+
+        // 此时freq = minFreq + 1且之前的列表为空   则最小访问频次+1
+        if(node->freq == minFreq + 1 && freqToFreqList[minFreq]->isEmpty())
+            minFreq++;
+
+        // 更新访问频次
+        addFreqNum();
+    }
     
+public:
+    LFU_Cache(int capacity, int maxAverageNum=1000000)
+    : capacity(capacity), minFreq(INT8_MAX), maxAverageNum(maxAverageNum)
+    , curAverageNum(0), curTotalNum(0)
+    {}
+
+    ~LFU_Cache() override = default;
+
+    void put(Key key, Value value) override
+    {
+        if(capacity == 0)
+            return;
+        std::lock_guard<std::mutex> lock(mutex);
+        if(nodeMap.find(key) != nodeMap.end())
+        {
+            nodeMap[key]->value = value;
+            // 访问次数+1
+            getInternel(nodeMap[key], value);
+            return;
+        }
+        putInternel(key, value);
+    }
+
+    bool get(Key key, Value& value) override
+    {
+        std::lock_guard<std::mutex> lock(mutex);
+        auto it = nodeMap.find(key);
+        if(it != nodeMap.end())
+        {
+            getInternel(it->second, value);
+            return true;
+        }
+        return false;
+    }
+
+    Value get(Key key) override
+    {
+        Value value;
+        get(key, value);
+        return value;
+    }
+
+    // 清空缓存 回收资源
+    void purge()
+    {
+        nodeMap.clear();
+        freqToFreqList.clear();
+    }
 };
-
-
-
 
 
 
