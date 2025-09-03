@@ -10,7 +10,7 @@
 namespace Cache
 {
     
-template<typename Key, typename Value> class LFU_Cache;
+template<typename Key, typename Value> class LFUCache;
 
 // 新加入的结点使用尾插法插入尾部   
 // 访问次数增加后需删去的结点直接拿出
@@ -81,10 +81,12 @@ public:
     // 获取头部第一个结点用于置换删除
     NodePtr getFirstNode() const {  return head->next;  }
 
+    friend class LFUCache<Key, Value>;
+
 };
 
 template<typename Key, typename Value>
-class LFU_Cache : Policy<Key, Value>
+class LFUCache : public Policy<Key, Value>
 {
     using Node = typename NodeList<Key, Value>::Node;
     using NodePtr = std::shared_ptr<Node>;
@@ -146,7 +148,7 @@ private:
     {
         minFreq = INT8_MAX;
         // 遍历找出最小的访问频率
-        for(const auto& pair : nodeMap)
+        for(const auto& pair : freqToFreqList)
             if(!pair.second && !pair.second->isEmpty())
                 minFreq = std::min(minFreq, pair.first);
         if(minFreq == INT8_MAX)
@@ -172,9 +174,9 @@ private:
         // 所有的节点频率 -= MaxAverageNum / 2
         for(auto it : nodeMap)
         {
-            if(!it->second)
+            if(!it.second)
                 continue;
-            NodePtr node = it->second;
+            NodePtr node = it.second;
 
             removeFromFreqList(node);
             node->freq = (node->freq - maxAverageNum / 2) > 1 ? node->freq - maxAverageNum / 2: 1;
@@ -224,12 +226,12 @@ private:
     }
     
 public:
-    LFU_Cache(int capacity, int maxAverageNum=1000000)
+    LFUCache(int capacity, int maxAverageNum=1000000)
     : capacity(capacity), minFreq(INT8_MAX), maxAverageNum(maxAverageNum)
     , curAverageNum(0), curTotalNum(0)
     {}
 
-    ~LFU_Cache() override = default;
+    ~LFUCache() override = default;
 
     void put(Key key, Value value) override
     {
@@ -273,6 +275,52 @@ public:
     }
 };
 
+// LFU分片缓存
+template<typename Key, typename Value>
+class LFU_HashCache : public Policy<Key, Value>
+{
 
+private:
+    size_t capacity;    // 总容量
+    int sliceNum;       // 分片数
+    std::vector<std::unique_ptr<LFUCache<Key, Value>>> LFU_SliceCaches; // 分片缓存
+
+    // key -> hash值
+    static size_t hash(Key key)
+    {
+        std::hash<Key> hashFunc;
+        return hashFunc(key);
+    }
+
+public:
+
+    LFU_HashCache(size_t capacity, int sliceNum, int maxAverageNum = 10)
+    : sliceNum(sliceNum > 0 ? sliceNum : std::thread::hardware_concurrency())
+    , capacity(capacity)
+    {
+        size_t sliceSize = std::ceil(capacity / static_cast<double>(sliceNum));
+        for(int i=0; i<sliceNum; i++)
+            LFU_SliceCaches.emplace_back(new LFUCache<Key, Value>(sliceSize, maxAverageNum));
+    }
+
+    void put(Key key, Value value) override
+    {
+        size_t position = hash(key) % sliceNum;
+        LFU_SliceCaches[position]->put(key, value);
+    }
+
+    bool get(Key key, Value& value)
+    {
+        size_t position = hash(key) % sliceNum;
+        return LFU_SliceCaches[position]->get(key, value);
+    }
+
+    Value get(Key key)
+    {
+        Value value{};
+        get(key, value);
+        return value;
+    }
+};
 
 };

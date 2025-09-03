@@ -302,21 +302,21 @@ public:
             LRU_SliceCaches.emplace_back(new LRUCache<Key, Value>(sliceSize));
     }
 
-    void put(Key key, Value value)
+    void put(Key key, Value value) override
     {
         // 计算出对应的分片位置并放入值
         size_t position = Hash(key) % sliceNum;
         LRU_SliceCaches[position]->put(key, value);
     }
 
-    bool get(Key key, Value& value)
+    bool get(Key key, Value& value) override
     {
         // 计算出分片位置并获取值
         size_t position = Hash(key) % sliceNum;
         return LRU_SliceCaches[position]->get(key, value);
     }
 
-    Value get(Key key)
+    Value get(Key key) override
     {
         // 调用get(key, & value)方法
         Value value{};
