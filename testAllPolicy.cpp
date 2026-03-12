@@ -311,6 +311,16 @@ int main()
     cout << std::thread::hardware_concurrency() << std::endl;
     // 初始化数据库
     SQL_l sql("source.db");
+
+    sql.executeQuery("CREATE TABLE IF NOT EXISTS Pages (id INTEGER PRIMARY KEY AUTOINCREMENT, key INTEGER unique, value TEXT);");
+    // for(int i=0;i < 5020; i++)
+    // {
+    //     std::string value = std::to_string(i+1);
+    //     std::string insert_sql = "INSERT INTO Pages (key, value) VALUES('" + std::to_string(i) + "', " + value + ");";
+    //     if(sql.insertData(insert_sql))
+    //         cout << "success\n";
+    // }
+    // sql.printAll("Pages");
     testHotDataAccess(sql);
     testLoopPattern(sql);
     testWorkloadShift(sql);
