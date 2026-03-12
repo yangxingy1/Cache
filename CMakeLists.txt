@@ -21,4 +21,5 @@ set(SOURCES
 add_executable(Cache ${SOURCES})
 
 # 链接 .a 静态导入库
-target_link_libraries(Cache PRIVATE ${PROJECT_SOURCE_DIR}/lib/SQLite3/libsqlite3.a)
+# target_link_libraries(Cache PRIVATE ${PROJECT_SOURCE_DIR}/lib/SQLite3/libsqlite3.a)
+target_link_libraries(Cache sqlite3)
